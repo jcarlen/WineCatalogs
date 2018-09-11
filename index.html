@@ -1,6 +1,15 @@
 <html>
     <body>
 
+<h2>Overview</h2>
+
+<b>Goal:</b> Turn scanned images of catalogs from the fine wine and spirit store Sherry-Lehmann into structured data.
+
+<br>
+
+<b>Are we doing anything else?</b>
+
+Yes. Learning about optical character recognition (OCR) and publicly available OCR tools (including tuning them), comparing different OCR engines and potentially combinining their results, developing metrics to measure OCR performance in this context, and, last but not least, building collaborative data science skills.
 
 <h2>Background Information</h2>
 <ul>	
@@ -25,6 +34,10 @@ In this collection, there are
 
 <a href="UCD_Lehmann_0036.jpg" target="window"><img src="UCD_Lehmann_0036.jpg" width=100 height=100></img></a>
 
+<br> Items for sale are usually organized in tables,
+but the layout of the tables changes from catalog to catalog or even page to page.
+This makes our job fun.
+
 <h2>To Recover</h2>
 Some or all of the following characteristics for each beverage (wine, spirit, champagne, etc.):
 <ul>
@@ -37,12 +50,19 @@ Some or all of the following characteristics for each beverage (wine, spirit, ch
 <li> Wine and liquor (not just wine)
 </ul>
 
+You may want to start with name and price, which are the most consistently available fields.
 
 
-<h2>Metadata</h2>
+<h2>Metadata</h2><a id="metadata"></a>
 
-<a href="Sherry Lehmann Crosswalk Page to Catalog.xlsx">spreadsheet</a> 
+In this <a href="Sherry Lehmann Crosswalk Page to Catalog.xlsx">spreadsheet</a>,
 connecting pages to catalogs to JPG files, which pages have prices, etc.
+
+<ul>
+    <li> The page_xwalk tab connects image file names to page and catalogs IDs and catalog page numbers. </li>
+    <li> The catalogs and pages tabs have additional data organized by ID, such as the catalog titles. <!--which pages have prices (where is this?) --> </li>
+    <li> The marks tab refers to data that has been crowd-sourced for accuracy and can be used for training. It is a small set though, only 1343 entries where each refers to one item, not one box or table </li>
+</ul>
 
 
 <h2>Data</h2>	
@@ -51,10 +71,13 @@ connecting pages to catalogs to JPG files, which pages have prices, etc.
 	<a href="SampleCatalogPages.tar.bz2">A sample of 100</a> of the 4111 pages of the catalogs. This is  a bz2 tar archive. (Ask if you don't know what this means or how to deal with it.)
 	<li> <a href="Half.tar.bz2">Half-resolution.tar.bz2</a>The same 100 images, but at 3000x2000 resolution.
 
-	<li> <a href="SampleCatalogFiles_docx.tar.gz">DOCX files from PDFPenPro</a> The docx files from converting the jpes in the original sample of 100 images using PDFPenPro. Not all images were succesfully converted so 
-         some are not present in this archive.
+<br>
+<h3>Processed Data</h3>
 
-        <li> <a href="FullBoxes.rds">tesseract results from 100 Sample images</a>.  This is an R RDS file (use readRDS()) containing the result of calling GetBoxes() in the Rtesseract package on each of the 100 images in the original sample.
+    <li> <a href="FullBoxes.rds">tesseract results from 100 Sample images</a>  This is an R RDS file (use readRDS()) containing the result of calling GetBoxes() in the Rtesseract package on each of the 100 images in the original sample.
+	<li> <a href="SampleCatalogFiles_docx.tar.gz">DOCX files from PDFPenPro</a> The docx files from converting the jpegs in the original sample of 100 images using PDFPenPro, a commercial OCR program. Not all images were succesfully converted so some are not present in this archive.
+
+
 	</ul>
 
 
@@ -141,6 +164,8 @@ Each is about 1.1Gb.
 
 <h2>Things To Consider</h2>
 
+<h3>Pre-processing</h3>
+
 The results from GetBoxes() are from processing the original image.
 <ul>
 <li>For some images with text in different (light) colors, converting the image
@@ -148,8 +173,13 @@ to black and white using an appropriate threshold is necessary to recover the te
 <li>Some scanned images are rotated more than others which can reduce the accuracy of
 tesseract's recovered words and can also lead to additional complexities when 
 aligning the results.  One can rotate the image before passing it to GetBoxes().
-<li>There is crowd-sourced "truth" data in the spreadsheet for specific entries for some pages.
-<li>We have created <a href="Truth1.tar.gz">"truth" sets for about 40 pages</a>.
+</ul>
+
+<h3>Ground truth / training</h3>
+
+<ul>
+<li>As mentioned in the <a href = "#metadata">metadata</a> section there is crowd-sourced "truth" data in the spreadsheet for specific entries for some pages.
+<li>We have created <a href="Truth1.tar.gz">"truth" sets for about 40 pages</a>. They may only contain name, price and year information for each item.
 </ul>
     </body>
 </html>
