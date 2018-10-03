@@ -27,9 +27,9 @@ library(stringr)
 library(jpeg)
 library(cluster)
 
-FullBoxes = readRDS("FullBoxes.rds")
+FullBoxes = readRDS("FullBoxes.rds") #download from http://dsi.ucdavis.edu/WineCatalogs/FullBoxes.rds
 
-source("~/Documents/DSI/OCR_SherryLehmann/helper.R")
+source("~/Documents/DSI/WineCatalogs_forked_repo/helper.R")
 
 # Functions
 # 2. Get iterative column info  ####
