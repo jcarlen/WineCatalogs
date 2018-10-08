@@ -74,7 +74,7 @@ I did this in two ways
 	Output is data/foo.traineddata - check the size it should be slightly larger than the eng.traineddata file it was built off
 
 
-### 6)  test out the model to see if more iterations can be helpful without overfitting
+### 6)  Test out the model to see if more iterations can be helpful without overfitting
 
     sh jane/janetrain.sh 
 
@@ -88,18 +88,19 @@ calls lstmeval for english and foo w/ training and testing data, e.g.
 
 set --debug_interval -1 for more verbose training
 
-Can also continue from an .lstm file.
-	.lstm can be extracted from .traineddata with combine_tessdata -e, e.g. 
-	(See doc file for combine_tessdata in tesseract/doc)
+General note: you can also continue from an .lstm file.
+	.lstm can be extracted from .traineddata with combine_tessdata -e (See doc file for combine_tessdata in tesseract/doc), e.g. 
+	
         combine_tessdata -e tessdata_new/eng.traineddata tessdata_new/eng.lstm
 
 You can see what files are in a .traineddata file with combine_tessdata -d, e.g.
+        
         combine_tessdata -d tessdata_new/eng.traineddata
 
 
 ### 8) When done training, make finished model (data/foo.traineddata)
 
-lstmtraining --stop_training --continue_from data/checkpoints/foo_checkpoint --old_traineddata tessdata_new/eng.traineddata  --traineddata data/foo/foo.traineddata --model_output data/foo.traineddata
+    lstmtraining --stop_training --continue_from data/checkpoints/foo_checkpoint --old_traineddata tessdata_new/eng.traineddata  --traineddata data/foo/foo.traineddata --model_output data/foo.traineddata
 
  - test again, 
 
@@ -108,14 +109,14 @@ lstmtraining --stop_training --continue_from data/checkpoints/foo_checkpoint --o
 
 ### 9)  Add foo.trainneddata to tesseract languages, e.g.
 
-sudo cp data/foo.traineddata /usr/local/share/tessdata/foo.traineddata
+    sudo cp data/foo.traineddata /usr/local/share/tessdata/foo.traineddata
 
 
 ### 10)  Test and compare
 
-sh jane/janetest.sh calls tesseract from the command line and diff
-
-E.g., 
+    sh jane/janetest.sh 
+    
+calls tesseract from the command line and diff, e.g., 
 
 Test
 
