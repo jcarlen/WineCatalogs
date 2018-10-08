@@ -47,26 +47,30 @@ See included  version of the makefile
 ### 4)  Create some new training data
 
 I did this in two ways 
-i) Using Rtesseract GetBoxes I extracted very high confidence words (saving corresponding text and image files). I checked enough to think that they were trustworthy, and then created many more.
-ii) Using Rtesseract GetBoxes I extracted low confidence words with characters of interests (e.g. 3's and 8's which tend to get mixed up). I fixed them by hand, so only about 100 of them total. See sections 3-5 of wine_truth.R (attached) which is my code for creating tiff and text file pairs.  Notice the tiff files are changed to ".tif" and the corresponding text files are changed to ".gt.txt".
 
-All are then moved to ocrd-train-master/data/train/
+- i) Using Rtesseract GetBoxes I extracted very high confidence words (saving corresponding text and image files). I checked enough to think that they were trustworthy, and then created many more.
+- ii) Using Rtesseract GetBoxes I extracted low confidence words with characters of interests (e.g. 3's and 8's which tend to get mixed up). I fixed them by hand, so only about 100 of them total. See sections 3-5 of wine_truth.R (attached) which is my code for creating tiff and text file pairs.  Notice the tiff files are changed to ".tif" and the corresponding text files are changed to ".gt.txt".
+
+- All are then moved to ocrd-train-master/data/train/
 
 - There's a way to create new training data using fonts but I didn't try it out since it's not useful for my application.
 
 
-### 5) make training
+### 5) Train
 
-From within ocrd-train-master. First builds box and .lstmf files. Terminal output should show this happening. 
-Divides the training data into a train and test set (default 90/10 split)
-Creates a merged unicharset from English and the training data
-Creates a starter .traineddata file with combine_lang_model
+    make training
+
+- From within ocrd-train-master. 
+- First builds box and .lstmf files. Terminal output should show this happening. 
+- Divides the training data into a train and test set (default 90/10 split)
+- Creates a merged unicharset from English and the training data
+- Creates a starter .traineddata file with combine_lang_model
 	could base on the eng charset with --input_unicharset langdata_lstm-master/eng/eng.unicharset
 	if for some reason you wanted to bypass creating a merged unicharset
-Trains the model with lstmtraining
+- Trains the model with lstmtraining
 	checkpoints go to data/checkpoints. foo checkpoint names show character error and iteration
         there's a flag to congrol the iteratons --max_iterations 1000
-Turn the model into a final model with lstmtraining --stop_training
+- Turn the model into a final model with lstmtraining --stop_training
 	Output is data/foo.traineddata - check the size it should be slightly larger than the eng.traineddata file it was built off
 
 
