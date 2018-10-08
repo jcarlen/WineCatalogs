@@ -1,7 +1,7 @@
 ## Jane's Notes for Fine-Tune Training for Tesseract 4 (on OSX)
 
 Read this guide first: https://github.com/tesseract-ocr/tesseract/wiki/TrainingTesseract-4.00 
-
+I'm woirking off the most recent tesseract build, 4.0.0-rc1-15-ga862
 
 ### 1) When installing tesseract, be sure to do the steps to build and install the training tools. (It will prompt you after ./configure):
 
@@ -143,7 +143,7 @@ Included files:
 
 - Makefile - My modified version
 
-- wine_truth.R - Used to make .tx.txt and .tif pairs (see sections 3-5)
+- wine_truth.R - (In the R folder one level up). Used to make .tx.txt and .tif pairs (see sections 3-5)
 
 - sample_train.zip - A few .gt.txt  and .tif files pairs to try it out before investing time
 
