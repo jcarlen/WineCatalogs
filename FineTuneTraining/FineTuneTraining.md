@@ -86,9 +86,9 @@ calls lstmeval for english and foo w/ training and testing data, e.g.
 
     lstmtraining --continue_from data/checkpoints	--old_traineddata tessdata_new/eng.traineddata 	--traineddata data/foo/foo.traineddata    --model_output data/checkpoints/foo  --debug_interval 0 	--train_listfile data/list.train --eval_listfile data/list.eval --sequential_training --max_iterations 1000
 
-set --debug_interval -1 for more verbose training
+- set --debug_interval -1 for more verbose training
 
-General note: you can also continue from an .lstm file.
+- General note: you can also continue from an .lstm file.
 	.lstm can be extracted from .traineddata with combine_tessdata -e (See doc file for combine_tessdata in tesseract/doc), e.g. 
 	
         combine_tessdata -e tessdata_new/eng.traineddata tessdata_new/eng.lstm
@@ -141,8 +141,12 @@ from in ocrd-train-master, to clear out generated files in the data folder, e.g.
 
 Included files:
 
-Makefile - My modified version
-wine_truth.R - Used to make .tx.txt and .tif pairs (see sections 3-5)
-sample_train.zip - A few .gt.txt  and .tif files pairs to try it out before investing time
-janetrain.sh - quick check for under/overfitting
-janetest.sh - quick check of results
+- Makefile - My modified version
+
+- wine_truth.R - Used to make .tx.txt and .tif pairs (see sections 3-5)
+
+- sample_train.zip - A few .gt.txt  and .tif files pairs to try it out before investing time
+
+- janetrain.sh - quick check for under/overfitting
+
+- janetest.sh - quick check of results
