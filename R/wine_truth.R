@@ -17,7 +17,7 @@
 
 dir1 = "~/Documents/DSI/OCR_SherryLehmann/"
 setwd(dir1)
-tessdata_train = "~/Documents/DSI/tesseract_train/ocrd-train-master/data/train"
+tessdata_train = "~/Documents/DSI/ocrd-train-master/data/train"
 
 library(Rtesseract)
 library(readxl)
@@ -25,6 +25,7 @@ library(dplyr)
 library(R.utils)
 library(magick)
 library(stringr)
+library(ggplot2)
 
 ########################################################################################################################
 
@@ -112,13 +113,26 @@ mark_pages10 = subset(marks, marks$catalog_id %in% names(sort(table(marks$catalo
 # make corresponding image (.tiff -> tif) and text truth (gt.txt) files for training
 # I took ones with high-confidence and spot checked that they were right
 
-make_box_tiff <- function(img1, sample1, basedir = "Sample", conf = 90, conf.upper = NULL, level = "word",
+
+
+
+
+make_box_tiff <- function(img1 = NULL, sample1 = NULL, boxes = NULL, basedir = "Sample", conf = 90, conf.upper = NULL, level = "word",
                           write = T, fix = F, pattern = NULL) {
-  img1.path = paste0(basedir, "/", sample1, "/", img1, ".jpg",sep = "", collapse = "")
-  img1.read = image_read(img1.path)
-  test1.api = tesseract(img1.path)
-  test1.boxes = GetBoxes(test1.api, level = level)
+  
+  if (!is.null(img1) & !is.null(sample1)) {
+    img1.path = paste0(basedir, "/", sample1, "/", img1, ".jpg",sep = "", collapse = "")
+    img1.read = image_read(img1.path)
+    test1.api = tesseract(img1.path)
+    test1.boxes = GetBoxes(test1.api, level = level)
+  } else {
+    if (!is.null(boxes)) {
+      test1.boxes = boxes
+    } else stop("Need either an image number and sample folder OR GetBoxes output")
+  }
+  
   hist(test1.boxes$confidence, breaks = 20)
+  
   if (level == "textline") {bump = 2} else {bump = 0} #so single character with \n getx caught if type is textline
   test1.confboxes = dplyr::filter(test1.boxes, confidence > conf[1] & (nchar(test1.boxes$text) >= (2+bump) )) #found some issues with length-1 boxes, e.g. graphics being interpreted as vertical slashes and dots as i's
   
@@ -266,3 +280,79 @@ file.copy(paste0("Fix/", list.files(path = "Fix", pattern = ".*\\.tif$", recursi
 file.copy(paste0("Fix/", list.files(path = "Fix", pattern = ".*\\.gt.txt$", recursive = T)), tessdata_train)
 
 #Last step was to manually fix these examples so they would represent truth
+
+
+########################################################################################################################
+
+# 6. Try training on a catalog's easy cases to then get the rest of the catalog
+
+# 6a. Setup ####
+
+setwd("Sample") #assumes we're in OCR_ directory
+
+#cat_files = inner_join(sample_files, page_xwalk, by = "file") %>%
+#  select(c("catalog_id", "Sample", "file.jpg")) %>% arrange(catalog_id) %>% 
+#  left_join(catalogs[,c("catalog_id", "title")], by = "catalog_id")
+#cat_files = split(cat_files, cat_files$title)
+#saveRDS(cat_files, "../cat_files.RDS")
+
+readRDS("../cat_files.RDS")
+
+# 6b. Pick a file (and catalog) ####
+
+filenum = "0008"
+which_cat = which(unlist(lapply(cat_files, function(x) {
+  sum(grepl(paste(".*", filenum, sep=""), x$file.jpg))
+}))>0)
+
+# look at text distribution from this catalog:
+#cat_textTypes = textTypes(cat_files, catalog = which_cat)
+#cat_files[which_cat][[1]][is.na(cat_textTypes$price) | cat_textTypes$price < 4,]
+
+# 6c. GetBoxes on all catalog images (results in cat.text)
+
+cat.images = cat_files[which_cat][[1]]
+cat.text = vector("list", nrow(cat.images))
+for(i in 1:nrow(cat.images)) {
+    print(i)
+    y = cat.images[i,]
+    cat.text[[i]] = GetBoxes(deskew(paste(y$Sample, y$file.jpg, sep = "/")))
+    #if deskew causes crashes
+    #GetBoxes(paste(y$Sample, y$file.jpg, sep = "/"))
+}
+
+#saveRDS(cat.text, "../cat204.RDS")
+
+# 6c. Explore output from the catalog (text types, confidence distributions)
+
+# If median confidence is below 25 (or 30?) it's probably an image
+# If there are no prices (NA)
+  # but mean conficence is > 30-35 it's probably a text page 
+  # but mean conficence is < 25-30 it's probably a picture page
+
+cat.textTypes = lapply(cat.text, function(x) {
+  data.frame(as.list(table(sapply(x$text, isPrice, maybe = TRUE))))
+})
+cat.textTypes = bind_rows(cat.textTypes)
+names(cat.textTypes) = sapply(names(cat.textTypes), switch, "FALSE." = "other_text","number" = "number", "TRUE." = "price",
+                           "number." = "number*", "X.number" = "*number")
+
+cat.textDF = data.frame(bind_rows(cat.text), 
+                        file = rep(cat.images$file.jpg, sapply(cat.text, nrow)),
+                        Nprice = rep(cat.textTypes$price, sapply(cat.text, nrow))) %>%
+                        group_by(file) %>% mutate(median = median(confidence)) %>% ungroup() %>%
+                        mutate(title = paste(str_pad(Nprice, 2, "left"), str_extract(file, "[0-9]{4}"), round(median,1), sep = "_"))
+
+write.csv(cat.textDF, file = "../cat_textDF.csv")
+
+ggplot(cat.textDF, aes(x = confidence)) + geom_histogram() +
+  facet_wrap(~title) + 
+  ggtitle("Distribution of confidences by image", subtitle =  "Title = Nprice _ image number _ Median confidence")
+
+# 6d. Extract high-confidence words from this catalog
+
+highconf = filter(cat.textDF, median > 25 & !is.na(Nprice) & confidence > 96.5)
+
+make_box_tiff(boxes = highconf )
+
+return(text.types)
