@@ -1,4 +1,4 @@
-# File to convert available truth to usable training data
+# File to convert available information to usable training data
 # Jane Carlen
 # Created: 9-27-18
 #
@@ -12,9 +12,7 @@
 #    mark boxes only have an xy coordinate, not a box size
 #
 ########################################################################################################################
-
-# 0. Setup
-
+# 0. Setup ####
 dir1 = "~/Documents/DSI/OCR_SherryLehmann/"
 setwd(dir1)
 tessdata_train = "~/Documents/DSI/ocrd-train-master/data/train"
@@ -29,7 +27,8 @@ library(ggplot2)
 
 ########################################################################################################################
 
-# 1. Marks - Get mark information from spreadsheets and link to images (df: marks_image): ####
+# 1. Links file to the sample folder it's in (sample_files) -- did help ####
+#    Links mark information from spreadsheets to images (marks_image) -- didn't help ####
 
 marks = read_xlsx("Sherry Lehmann Crosswalk Page to Catalog.xlsx", sheet = "marks")
 pages = read_xlsx("Sherry Lehmann Crosswalk Page to Catalog.xlsx", sheet = "pages")
@@ -40,7 +39,8 @@ marks = left_join(marks, pages, by = "page_id")
 marks = left_join(marks, catalogs, by = "catalog_id")
 
 
-## Downloand images to re-organize by catalog: ####
+########################################################################################################################
+##   Downloand images to re-organize by catalog: ####
 # sample_files = paste("http://dsi.ucdavis.edu/WineCatalogs/Sample", 1:41, ".tar.bz2", sep = "")
 # dest_file = paste("~/Downloads/Sample", 1:41, ".tar.bz2", sep = "")
 # i = 1
@@ -50,7 +50,7 @@ marks = left_join(marks, catalogs, by = "catalog_id")
 # }
 ## then I moved and decompressed them from the finder
 
-## Download tesseract output to re-organize by catalog: ####
+##   Download tesseract output to re-organize by catalog: ####
 # sample_files = paste("http://dsi.ucdavis.edu/WineCatalogs/Sample", 1:41, ".rds", sep = "")
 # dest_file = paste("Sample/Sample_tessGetBoxes/Sample", 1:41, ".rds", sep = "")
 # i = 1
@@ -60,7 +60,7 @@ marks = left_join(marks, catalogs, by = "catalog_id")
 # }
 
 
-## Re-organize downloaded files by where they appeared (sample_files connects img to sample) ####
+##   Re-organize downloaded files by where they appeared (sample_files connects img to sample) ####
 # where's 30 yo?
 
 dest_folders = paste("~/Documents/DSI/OCR_SherryLehmann/Sample/Sample", c(1:29,31:41), sep = "")
@@ -84,7 +84,10 @@ marks_image = as.data.frame(marks_image)
 
 sample_files[which(sample_files$file == "UCD_Lehmann_1835"),]
 sample_files$Sample = as.character(sample_files$Sample)
-## Can use marks_image to the find the sample that the image is in. eg ####
+
+#saveRDS(sample_files, "sample_files.RDS")
+
+##   Can use marks_image to the find the sample that the image is in. eg ####
 # (But note the order of images in the Sample.rds files is NOT the same as in the image folders?)
 
 Sample26 = readRDS("Sample/Sample_tessGetBoxes/Sample26.rds")
@@ -94,9 +97,8 @@ Sample26 = do.call(rbind, Sample26)
 Sample26$file = str_extract(rownames(Sample26), ".*(?=\\.)")
 #have to index from file by name
 
-## Catalogs with the top 10 most marks ####
+##   Catalogs with the top 10 most marks ####
 mark_pages10 = subset(marks, marks$catalog_id %in% names(sort(table(marks$catalog_id), decreasing = T)[1:10]))
-
 
 
 ########################################################################################################################
@@ -105,6 +107,7 @@ mark_pages10 = subset(marks, marks$catalog_id %in% names(sort(table(marks$catalo
 
 # Helpful for evaluating whole tables. Values are disconnected from positions so not helpful for individual word accuracy.
 
+# see mkTruth2.R
 
 ########################################################################################################################
 
@@ -113,23 +116,15 @@ mark_pages10 = subset(marks, marks$catalog_id %in% names(sort(table(marks$catalo
 # make corresponding image (.tiff -> tif) and text truth (gt.txt) files for training
 # I took ones with high-confidence and spot checked that they were right
 
-
-
-
-
-make_box_tiff <- function(img1 = NULL, sample1 = NULL, boxes = NULL, basedir = "Sample", conf = 90, conf.upper = NULL, level = "word",
-                          write = T, fix = F, pattern = NULL) {
+make_box_tiff <- function(img1 = NULL, sample1 = NULL, boxes = NULL, basedir = "Sample", fixdir = NULL, conf = 90, conf.upper = NULL, level = "word",
+                          write = T, pattern = NULL, deskew = F) {
   
-  if (!is.null(img1) & !is.null(sample1)) {
-    img1.path = paste0(basedir, "/", sample1, "/", img1, ".jpg",sep = "", collapse = "")
-    img1.read = image_read(img1.path)
-    test1.api = tesseract(img1.path)
+  img1.path = paste0(basedir, "/", sample1, "/", img1, ".jpg",sep = "", collapse = "")
+  
+  test1.api = tesseract(img1.path)
+  if (is.null(boxes)) {
     test1.boxes = GetBoxes(test1.api, level = level)
-  } else {
-    if (!is.null(boxes)) {
-      test1.boxes = boxes
-    } else stop("Need either an image number and sample folder OR GetBoxes output")
-  }
+  } else {test1.boxes = boxes}
   
   hist(test1.boxes$confidence, breaks = 20)
   
@@ -152,18 +147,31 @@ make_box_tiff <- function(img1 = NULL, sample1 = NULL, boxes = NULL, basedir = "
   }
   #write .tiff and corresponding .gt.txt files
   if(write) {
-    if(fix) {
-      basedir = "Fix"
+    
+    # if we need to put the files in a tmp location (probably to fix them before adding to training data)
+    if(!is.null(fixdir)) {
+      basedir = fixdir
       if (!R.utils::isDirectory(paste0(basedir, "/", sample1, "/tiff"))) {
         mkdirs(paste0(basedir, "/", sample1, "/tiff"))
       }
       if (!R.utils::isDirectory(paste0(basedir, "/", sample1, "/text"))) {
         mkdirs(paste0(basedir, "/", sample1, "/text"))
       }
+    } 
+    
+    if (deskew) {
+      test1.api.crop = tesseract(deskew(img1.path))
+      pixWrite(deskew(img1.path), file = "img1temp", format = "JPG")
+      img1.read = image_read("img1temp")
+      #workoround so that cropped boxes are from deskewed, makes them B&W which seems OK
+    } else { 
+      img1.read = image_read(img1.path)
+      test1.api.crop = tesseract(img1.path)
     }
+    
     sapply(1:nrow(test1.confboxes), function(y) {
       x = test1.confboxes[y,]
-      test1.api.crop = tesseract(img1.path)
+
       SetRectangle(test1.api.crop, dims = c(x$left, x$bottom, x$right-x$left, x$top-x$bottom))
       test1.box = GetBoxes(test1.api.crop, level = level)
       tmp.box = image_crop(img1.read, geometry_area(x$right-x$left, x$top-x$bottom, x$left, x$bottom),
@@ -191,10 +199,10 @@ make_box_tiff <- function(img1 = NULL, sample1 = NULL, boxes = NULL, basedir = "
 
 # 4. Make training files (examples) ####
 
-##  test on some images from the most-marked catalogs: ####
+##   test on some images from the most-marked catalogs: ####
 sort(table(mark_pages10$catalog_id), decreasing = TRUE)[1:3]
 
-##   catalog 1 ####
+##    catalog 1 ####
 which(marks_image$catalog_id.y == "affdd39b-2e6b-4f1a-b605-6dcdd522842d")
 marks_image[.Last.value,]; table(.Last.value$file)
 
@@ -214,7 +222,7 @@ img1 = "UCD_Lehmann_0009" ; sample1 = as.character(sample_files[img1==sample_fil
 make_box_tiff(img1, sample1, conf = 97)
 make_box_tiff(img1, sample1, conf = 95, level = "textline")
 
-##   catalog 2 ####
+##    catalog 2 ####
 which(marks_image$catalog_id.y == "00dd420b-02ee-4ead-aa01-c939f189542f")
 marks_image[.Last.value,]; table(.Last.value$file)
 
@@ -227,7 +235,7 @@ make_box_tiff(img1, sample1, conf = 96.8)
 img1 = "UCD_Lehmann_0431" ; sample1 = as.character(sample_files[img1==sample_files$file, "Sample"]); print(sample1)
 make_box_tiff(img1, sample1, conf = 96.8)
 
-##   catalog 3 ####
+##    catalog 3 ####
 which(marks_image$catalog_id.y == "61593f99-fc2f-42cc-8748-5c79ca7a44ae")
 marks_image[.Last.value,]; table(.Last.value$file)
 
@@ -257,19 +265,19 @@ file.copy(list.files(path = ".", pattern = ".*\\.gt.txt$", recursive = T), tessd
 #confs between 0 and 10 seem to catch lots of non-text
 
 img1 = "UCD_Lehmann_0016" ; sample1 = as.character(sample_files[img1==sample_files$file, "Sample"]); print(sample1)
-make_box_tiff(img1, sample1, conf = 10, conf.upper = 70, write = T, fix = T, pattern = "8")
+make_box_tiff(img1, sample1, conf = 10, conf.upper = 70, write = T, fixdir = "Fix", pattern = "8")
 
 img1 = "UCD_Lehmann_0419" ; sample1 = as.character(sample_files[img1==sample_files$file, "Sample"]); print(sample1)
-make_box_tiff(img1, sample1, conf = 10, conf.upper = 70, write = T, fix = T, pattern = "3|8")
+make_box_tiff(img1, sample1, conf = 10, conf.upper = 70, write = T, fixdir = "Fix", pattern = "3|8")
 
 img1 = "UCD_Lehmann_2264" ; sample1 = as.character(sample_files[img1==sample_files$file, "Sample"]); print(sample1)
-make_box_tiff(img1, sample1, conf = 10, conf.upper = 80, write = T, fix = T, pattern = "3|8")
+make_box_tiff(img1, sample1, conf = 10, conf.upper = 80, write = T, fixdir = "Fix", pattern = "3|8")
 
 img1 = "UCD_Lehmann_2266" ; sample1 = as.character(sample_files[img1==sample_files$file, "Sample"]); print(sample1)
-make_box_tiff(img1, sample1, conf = 10, conf.upper = 90, write = T, fix = T, pattern = "3|8")
+make_box_tiff(img1, sample1, conf = 10, conf.upper = 90, write = T, fixdir = "Fix", pattern = "3|8")
 
 img1 = "UCD_Lehmann_2267" ; sample1 = as.character(sample_files[img1==sample_files$file, "Sample"]); print(sample1)
-make_box_tiff(img1, sample1, conf = 10, conf.upper = 90, write = T, fix = T, pattern = "3|8")
+make_box_tiff(img1, sample1, conf = 10, conf.upper = 90, write = T, fixdir = "Fix", pattern = "3|8")
 
 #make sure no other tiff or text files in the way
 file.copy(from = paste0("Fix/", list.files(path = "Fix", pattern = "\\.tiff$", recursive = T)),
@@ -283,12 +291,13 @@ file.copy(paste0("Fix/", list.files(path = "Fix", pattern = ".*\\.gt.txt$", recu
 
 
 ########################################################################################################################
-
-# 6. Try training on a catalog's easy cases to then get the rest of the catalog
+# 6. Try training on a catalog's easy cases to then get the rest of the catalog ####
 
 # 6a. Setup ####
 
-setwd("Sample") #assumes we're in OCR_ directory
+#assumes we're in OCR_ directory
+
+sample_files = readRDS("sample_files.RDS")
 
 #cat_files = inner_join(sample_files, page_xwalk, by = "file") %>%
 #  select(c("catalog_id", "Sample", "file.jpg")) %>% arrange(catalog_id) %>% 
@@ -296,7 +305,7 @@ setwd("Sample") #assumes we're in OCR_ directory
 #cat_files = split(cat_files, cat_files$title)
 #saveRDS(cat_files, "../cat_files.RDS")
 
-readRDS("../cat_files.RDS")
+cat_files = readRDS("cat_files.RDS")
 
 # 6b. Pick a file (and catalog) ####
 
@@ -309,27 +318,23 @@ which_cat = which(unlist(lapply(cat_files, function(x) {
 #cat_textTypes = textTypes(cat_files, catalog = which_cat)
 #cat_files[which_cat][[1]][is.na(cat_textTypes$price) | cat_textTypes$price < 4,]
 
-# 6c. GetBoxes on all catalog images (results in cat.text)
+# 6c. GetBoxes on all catalog images (results in cat.text) ####
 
 cat.images = cat_files[which_cat][[1]]
 cat.text = vector("list", nrow(cat.images))
 for(i in 1:nrow(cat.images)) {
     print(i)
     y = cat.images[i,]
-    cat.text[[i]] = GetBoxes(deskew(paste(y$Sample, y$file.jpg, sep = "/")))
+    cat.text[[i]] = GetBoxes(deskew(paste("Sample", y$Sample, y$file.jpg, sep = "/")))
     #if deskew causes crashes
-    #GetBoxes(paste(y$Sample, y$file.jpg, sep = "/"))
+    #GetBoxes(paste("Sample", y$Sample, y$file.jpg, sep = "/"))
 }
 
-#saveRDS(cat.text, "../cat204.RDS")
+#saveRDS(cat.text, paste("cat", which_cat, ".RDS", sep = ""))
 
-# 6c. Explore output from the catalog (text types, confidence distributions)
+# 6d. Explore output from the catalog (text types, confidence distributions) ####
 
-# If median confidence is below 25 (or 30?) it's probably an image
-# If there are no prices (NA)
-  # but mean conficence is > 30-35 it's probably a text page 
-  # but mean conficence is < 25-30 it's probably a picture page
-
+# what types of text are in the files?
 cat.textTypes = lapply(cat.text, function(x) {
   data.frame(as.list(table(sapply(x$text, isPrice, maybe = TRUE))))
 })
@@ -337,22 +342,54 @@ cat.textTypes = bind_rows(cat.textTypes)
 names(cat.textTypes) = sapply(names(cat.textTypes), switch, "FALSE." = "other_text","number" = "number", "TRUE." = "price",
                            "number." = "number*", "X.number" = "*number")
 
+# If median confidence is below 25 (or 30?) it's probably an image
+# If there are no prices (NA)
+#     but mean conficence is > 30-35 it's probably a text page 
+#     but mean conficence is < 25-30 it's probably a picture page
+
+# create data frame of all boxes from the entire catalog
 cat.textDF = data.frame(bind_rows(cat.text), 
                         file = rep(cat.images$file.jpg, sapply(cat.text, nrow)),
                         Nprice = rep(cat.textTypes$price, sapply(cat.text, nrow))) %>%
                         group_by(file) %>% mutate(median = median(confidence)) %>% ungroup() %>%
                         mutate(title = paste(str_pad(Nprice, 2, "left"), str_extract(file, "[0-9]{4}"), round(median,1), sep = "_"))
 
-write.csv(cat.textDF, file = "../cat_textDF.csv")
+write.csv(cat.textDF, file = paste("cat_textDF_before_", which_cat, ".csv", sep =""), row.names = F)
 
+# plot ####
 ggplot(cat.textDF, aes(x = confidence)) + geom_histogram() +
   facet_wrap(~title) + 
   ggtitle("Distribution of confidences by image", subtitle =  "Title = Nprice _ image number _ Median confidence")
 
-# 6d. Extract high-confidence words from this catalog
+# 6e. Extract high-confidence word/image pairs from this catalog ####
 
 highconf = filter(cat.textDF, median > 25 & !is.na(Nprice) & confidence > 96.5)
+highconf = left_join(highconf, sample_files[,c("file.jpg", "Sample")], by = c("file" = "file.jpg"))
+highconf = split(highconf, as.factor(as.character(highconf$file)))
+lapply(highconf, function(x) {
+  img1 = str_extract(x$file[1], "UCD_Lehmann_[0-9]{4}")
+  sample1 = x$Sample[1]
+  make_box_tiff(img1, sample1, boxes = x, conf = 96.5,
+                fixdir = paste("Fix_", which_cat, sep = ""),
+                deskew = TRUE)
+})
+              
+# 6f. Move to training ####
 
-make_box_tiff(boxes = highconf )
+#make sure no other tiff or text files in the way
+fixdir = paste("Fix_", which_cat, sep = "")
 
-return(text.types)
+file.copy(from = paste0(fixdir,"/", list.files(path = fixdir, pattern = "\\.tiff$", recursive = T)),
+          to = paste0(fixdir,"/", gsub(x = list.files(path = fixdir, pattern = "\\.tiff", recursive = T), "\\.tiff", ".tif")))
+
+file.copy(paste0(fixdir,"/", list.files(path = fixdir, pattern = ".*\\.tif$", recursive = T)), tessdata_train)
+
+file.copy(paste0(fixdir,"/", list.files(path = fixdir, pattern = ".*\\.gt.txt$", recursive = T)), tessdata_train)
+
+
+#  6g. Evaluate newly trained model
+
+# Check improvement(?) on truth set (see mkTruth2.R)
+
+# Check overall confidence distribution
+
