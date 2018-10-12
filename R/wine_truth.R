@@ -393,3 +393,20 @@ file.copy(paste0(fixdir,"/", list.files(path = fixdir, pattern = ".*\\.gt.txt$",
 
 # Check overall confidence distribution
 
+cat.text.retrained = vector("list", nrow(cat.images))
+for(i in 1:nrow(cat.images)) {
+  print(i)
+  y = cat.images[i,]
+  cat.text.retrained[[i]] = GetBoxes(deskew(paste("Sample", y$Sample, y$file.jpg, sep = "/")), lang = "foo")
+}
+
+cat.textDF.retrained = data.frame(bind_rows(cat.text.retrained), 
+                        file = rep(cat.images$file.jpg, sapply(cat.text.retrained, nrow)),
+                        Nprice = rep(cat.textTypes$price, sapply(cat.text, nrow))) %>%
+  group_by(file) %>% mutate(median = median(confidence)) %>% ungroup() %>%
+  mutate(title = paste(str_pad(Nprice, 2, "left"), str_extract(file, "[0-9]{4}"), round(median,1), sep = "_"))
+
+ggplot(cat.textDF.retrained, aes(x = confidence)) + geom_histogram() +
+  facet_wrap(~title) + 
+  ggtitle("Distribution of confidences by image (Retrained)", subtitle =  "Title = Nprice _ image number _ Median confidence")
+

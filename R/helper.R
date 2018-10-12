@@ -2,6 +2,7 @@
 # generally allows two characters of fudge
 # dollar sets whether to allow dollars signs before prices.
   # for tables default should be false
+
 isPrice = #Jane's version - different than Duncan's isPrice
   
   function(x, dollar = FALSE, maybe = FALSE) {
@@ -83,3 +84,34 @@ numToPrice = function(numAsChar, dollar = FALSE) {
   }
 }
   
+
+# Sort a catalog of images by instances of prices, numbers and other text
+# will inform if a page has a price table
+
+textTypes <- function(cat_files, catalog = NULL){
+  
+  if(is.null(catalog)) {catalog = sample(1:length(cat_files), 1)}
+  cat1 = cat_files[catalog][[1]]
+  cat("catalog number", catalog, "with", nrow(cat1), "files")
+  
+  text.tmp = lapply(paste(cat1$Sample, cat1$file.jpg, sep = "/"), function(x) {
+    text1 = GetText(x)
+    table1 = table(sapply(text1, isPrice, maybe = TRUE))
+    print(prop.table(table1))
+    return(data.frame(as.list(table1))) #if only one type skip -- wouldn't be a table page
+  })
+  
+  text.types= bind_rows(text.tmp)
+  names(text.types) = sapply(names(text.types), switch, "FALSE." = "other_text","number" = "number", "TRUE." = "price",
+                             "number." = "number*", "X.number" = "*number")
+  return(text.types)
+}
+
+#get a sample image
+
+#setwd("~/Documents/DSI/OCR_SherryLehmann/Sample")
+#img1 = ""
+#while(!grepl("jpg", img1)) {
+#  img1 = sample(list.files(".", recursive = T), 1)
+#}
+

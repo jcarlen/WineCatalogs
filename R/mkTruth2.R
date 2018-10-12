@@ -42,7 +42,7 @@ truth1$Case.1[c(2,7,9)] = c("35.75", "--", "41.75")
 truth1$Case.1 = c(truth1$Case.1[1:9], "49.75", truth1$Case.1[10:18])
 truth1 = as.list(data.frame(No1 = truth1$No., Case1 = truth1$Case, No2 = truth1$No..1, Case2 = truth1$Case.1))
 
-# 2b. fix one more from the same catalog
+# 2b. fix one more from the same catalog (from scratch)
 
 filenum = "0027"
 truth2 = list()
