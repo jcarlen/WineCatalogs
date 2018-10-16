@@ -23,7 +23,8 @@ filename = "Truth1/0008.csv"
 
 #which catalog is it in
 filenum = strsplit(filename, "\\.|/")[[1]][2]c
-load("Sample/.RData") #containts cat_files
+#load("Sample/.RData") #containts cat_files
+readRDS("~/Documents/DSI/WineCatalogs_forked_repo/FineTuneTraining/")
 which_cat = which(unlist(lapply(cat_files, function(x) {
   sum(grepl(paste(".*", filenum, sep=""), x$file.jpg))
 }))>0)
