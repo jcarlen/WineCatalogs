@@ -50,16 +50,6 @@ marks = left_join(marks, catalogs, by = "catalog_id")
 # }
 ## then I moved and decompressed them from the finder
 
-##   Download tesseract output to re-organize by catalog: ####
-# sample_files = paste("http://dsi.ucdavis.edu/WineCatalogs/Sample", 1:41, ".rds", sep = "")
-# dest_file = paste("Sample/Sample_tessGetBoxes/Sample", 1:41, ".rds", sep = "")
-# i = 1
-# for (elem in sample_files) {
-#   download.file(elem, dest_file[i])
-#   i = i + 1
-# }
-
-
 ##   Re-organize downloaded files by where they appeared (sample_files connects img to sample) ####
 # where's 30 yo?
 
@@ -299,11 +289,14 @@ file.copy(paste0("Fix/", list.files(path = "Fix", pattern = ".*\\.gt.txt$", recu
 
 sample_files = readRDS("sample_files.RDS")
 
-#cat_files = inner_join(sample_files, page_xwalk, by = "file") %>%
-#  select(c("catalog_id", "Sample", "file.jpg")) %>% arrange(catalog_id) %>% 
-#  left_join(catalogs[,c("catalog_id", "title")], by = "catalog_id")
-#cat_files = split(cat_files, cat_files$title)
-#saveRDS(cat_files, "../cat_files.RDS")
+# cat_files = inner_join(sample_files, page_xwalk, by = "file") %>%
+#   select(c("catalog_id", "Sample", "file.jpg")) %>% arrange(catalog_id) %>% 
+#   left_join(catalogs[,c("catalog_id", "title")], by = "catalog_id") %>%
+#   left_join(sample_files) %>%
+#   left_join(page_xwalk)
+# cat_files = split(cat_files, cat_files$title)
+
+#saveRDS(cat_files, "~/Documents/DSI/WineCatalogs_forked_repo/R/cat_files.RDS")
 
 cat_files = readRDS("cat_files.RDS")
 
@@ -346,20 +339,21 @@ names(cat.textTypes) = sapply(names(cat.textTypes), switch, "FALSE." = "other_te
 # If there are no prices (NA)
 #     but mean conficence is > 30-35 it's probably a text page 
 #     but mean conficence is < 25-30 it's probably a picture page
+# Seems to work on a page with rotate boxes too, tried 1009 in sample 26
 
 # create data frame of all boxes from the entire catalog
 cat.textDF = data.frame(bind_rows(cat.text), 
                         file = rep(cat.images$file.jpg, sapply(cat.text, nrow)),
                         Nprice = rep(cat.textTypes$price, sapply(cat.text, nrow))) %>%
                         group_by(file) %>% mutate(median = median(confidence)) %>% ungroup() %>%
-                        mutate(title = paste(str_pad(Nprice, 2, "left"), str_extract(file, "[0-9]{4}"), round(median,1), sep = "_"))
+                        mutate(title = paste(str_extract(file, "[0-9]{4}"), str_pad(Nprice, 2, "left"), round(median,1), sep = "_"))
 
 write.csv(cat.textDF, file = paste("cat_textDF_before_", which_cat, ".csv", sep =""), row.names = F)
 
 # plot ####
 ggplot(cat.textDF, aes(x = confidence)) + geom_histogram() +
   facet_wrap(~title) + 
-  ggtitle("Distribution of confidences by image", subtitle =  "Title = Nprice _ image number _ Median confidence")
+  ggtitle("Distribution of confidences by image", subtitle =  "Title = image number _ Nprice _ Median confidence")
 
 # 6e. Extract high-confidence word/image pairs from this catalog ####
 
@@ -387,12 +381,11 @@ file.copy(paste0(fixdir,"/", list.files(path = fixdir, pattern = ".*\\.tif$", re
 file.copy(paste0(fixdir,"/", list.files(path = fixdir, pattern = ".*\\.gt.txt$", recursive = T)), tessdata_train)
 
 
-#  6g. Evaluate newly trained model
+# 6g. Evaluate newly trained model ####
 
 # Check improvement(?) on truth set (see mkTruth2.R)
 
 # Check overall confidence distribution
-
 cat.text.retrained = vector("list", nrow(cat.images))
 for(i in 1:nrow(cat.images)) {
   print(i)
@@ -400,13 +393,47 @@ for(i in 1:nrow(cat.images)) {
   cat.text.retrained[[i]] = GetBoxes(deskew(paste("Sample", y$Sample, y$file.jpg, sep = "/")), lang = "foo")
 }
 
+cat.textTypes.retrained = lapply(cat.text.retrained, function(x) {
+  data.frame(as.list(table(sapply(x$text, isPrice, maybe = TRUE))))
+})
+cat.textTypes.retrained = bind_rows(cat.textTypes.retrained)
+names(cat.textTypes.retrained) = sapply(names(cat.textTypes.retrained), switch, "FALSE." = "other_text","number" = "number", "TRUE." = "price",
+                              "number." = "number*", "X.number" = "*number")
+
+
 cat.textDF.retrained = data.frame(bind_rows(cat.text.retrained), 
                         file = rep(cat.images$file.jpg, sapply(cat.text.retrained, nrow)),
-                        Nprice = rep(cat.textTypes$price, sapply(cat.text, nrow))) %>%
-  group_by(file) %>% mutate(median = median(confidence)) %>% ungroup() %>%
-  mutate(title = paste(str_pad(Nprice, 2, "left"), str_extract(file, "[0-9]{4}"), round(median,1), sep = "_"))
+                        Nprice = rep(cat.textTypes.retrained$price, sapply(cat.text.retrained, nrow))) %>%
+                        group_by(file) %>% mutate(median = median(confidence)) %>% ungroup() %>%
+                        mutate(title = paste(str_extract(file, "[0-9]{4}"), str_pad(Nprice, 2, "left"), round(median,1), sep = "_"))
 
 ggplot(cat.textDF.retrained, aes(x = confidence)) + geom_histogram() +
   facet_wrap(~title) + 
-  ggtitle("Distribution of confidences by image (Retrained)", subtitle =  "Title = Nprice _ image number _ Median confidence")
+  ggtitle("Distribution of confidences by image (Retrained)", subtitle =  "Title = image number _ Nprice _ Median confidence")
 
+
+# Check overall confidence distribution
+cat.text.retrained2 = vector("list", nrow(cat.images))
+for(i in 1:nrow(cat.images)) {
+  print(i)
+  y = cat.images[i,]
+  cat.text.retrained2[[i]] = GetBoxes(deskew(paste("Sample", y$Sample, y$file.jpg, sep = "/")), lang = "eng+foo")
+}
+
+cat.textTypes.retrained2 = lapply(cat.text.retrained2, function(x) {
+  data.frame(as.list(table(sapply(x$text, isPrice, maybe = TRUE))))
+})
+cat.textTypes.retrained2 = bind_rows(cat.textTypes.retrained2)
+names(cat.textTypes.retrained2) = sapply(names(cat.textTypes.retrained2), switch, "FALSE." = "other_text","number" = "number", "TRUE." = "price",
+                                        "number." = "number*", "X.number" = "*number")
+
+
+cat.textDF.retrained2 = data.frame(bind_rows(cat.text.retrained2), 
+                                  file = rep(cat.images$file.jpg, sapply(cat.text.retrained2, nrow)),
+                                  Nprice = rep(cat.textTypes.retrained2$price, sapply(cat.text.retrained2, nrow))) %>%
+  group_by(file) %>% mutate(median = median(confidence)) %>% ungroup() %>%
+  mutate(title = paste(str_extract(file, "[0-9]{4}"), str_pad(Nprice, 2, "left"), round(median,1), sep = "_"))
+
+ggplot(cat.textDF.retrained2, aes(x = confidence)) + geom_histogram() +
+  facet_wrap(~title) + 
+  ggtitle("Distribution of confidences by image (Retrained2)", subtitle =  "Title = image number _ Nprice _ Median confidence")
